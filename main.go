@@ -16,8 +16,15 @@ func main() {
 
 	// Set up CORS middleware
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"*"} // Update with your allowed origins
+	config.AllowOrigins = []string{"*"}
+	config.AllowHeaders = []string{"Content-Type", "Origin", "Accept", "*"}
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE"}
+	config.AllowHeaders = []string{"Access-Control-Allow-Origin", "Origin", "*"}
+	config.AllowHeaders = []string{"Access-Control-Allow-Methods", "POST, GET, PUT, DELETE, OPTIONS, XMODIFY"}
+	config.AllowHeaders = []string{"Access-Control-Allow-Credentials", "true"}
+	config.AllowHeaders = []string{"Access-Control-Max-Age", "86400"}
+	config.AllowHeaders = []string{"Access-Control-Allow-Headers", "X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept"}
+	config.AllowCredentials = true
 	router.Use(cors.New(config))
 
 	// Set up Logger middleware
