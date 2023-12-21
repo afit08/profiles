@@ -8,22 +8,18 @@ import (
 	"profile-api/configs"
 	"profile-api/helpers"
 	"profile-api/models"
+	"strings"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
 
 var userCollection *mongo.Collection = configs.GetCollection(configs.DB, "users")
-
-// var validate = validator.New()
-
-// type loginResponse struct {
-// 	Username string `json:"username"`
-// 	Token    string `json:"token"`
-// }
 
 func HashPassword(password string) string {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
@@ -56,6 +52,7 @@ func CreateUsers(c *gin.Context) {
 
 	user.ID = uuid.New().String()
 	user.Password = password
+	user.Roles = "user"
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
 
@@ -81,12 +78,127 @@ func CreateUsers(c *gin.Context) {
 		"desc":       user.Desc,
 		"job_name":   user.JobName,
 		"skill_name": user.Skills,
+		"role_name":  user.Roles,
 		"username":   user.Username,
 		"password":   user.Password,
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Role created",
+		"data":    result,
+		"status":  http.StatusCreated,
+	})
+}
+
+func ShowUser(c *gin.Context) {
+	token := c.GetHeader("Authorization")
+
+	if token == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  http.StatusUnauthorized,
+			"message": "Unauthorized",
+		})
+		c.Abort()
+		return
+	}
+
+	token = strings.Split(token, " ")[1]
+	claims, _ := helpers.DecodeToken(token)
+	id := claims["id"].(string)
+	filter := bson.M{"_id": id}
+
+	var users models.User
+	err := userCollection.FindOne(context.Background(), filter).Decode(&users)
+
+	if err != nil {
+		// Check if the user is not found
+		if err == mongo.ErrNoDocuments {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching user"})
+		return
+	}
+
+	result := []gin.H{
+		{
+			"id":       users.ID,
+			"name":     users.Name,
+			"image":    users.Image.Filename,
+			"desc":     users.Desc,
+			"job_name": users.JobName,
+			"skills":   users.Skills,
+			"roles":    users.Roles,
+		},
+	}
+
+	if len(result) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "No Data Roles",
+			"data":    []gin.H{},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Get Users",
+		"data":    result,
+		"status":  http.StatusOK,
+	})
+}
+
+func Login(c *gin.Context) {
+	var user models.User
+
+	request := new(models.LoginRequest)
+	if err := c.ShouldBind(request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  http.StatusBadRequest,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	err := userCollection.FindOne(context.Background(), bson.M{"username": request.Username}).Decode(&user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"status":  http.StatusInternalServerError,
+			"message": "login or password is incorrect",
+		})
+		return
+	}
+
+	passwordIsValid := VerifyPassword(request.Password, user.Password)
+	if !passwordIsValid {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"status":  http.StatusUnauthorized,
+			"message": "Invalid password",
+		})
+		return
+	}
+
+	claims := jwt.MapClaims{}
+	claims["id"] = user.ID
+	claims["roleType"] = user.Roles
+	claims["exp"] = time.Now().Add(time.Hour * 3).Unix() // expired in 3 hours
+
+	token, errGenerateToken := helpers.GenerateAllTokens(&claims)
+	if errGenerateToken != nil {
+		log.Println(errGenerateToken)
+		c.Status(http.StatusUnauthorized)
+		return
+	}
+
+	c.SetCookie("jwt", token, 86400, "/", "localhost", false, true)
+
+	result := gin.H{
+		"name":  user.Name,
+		"token": token,
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Login Successfully!!!",
+		"status":  http.StatusOK,
 		"data":    result,
 	})
 }

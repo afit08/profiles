@@ -11,7 +11,7 @@ type User struct {
 	Image     *multipart.FileHeader `form:"image,omitempty" bson:"image,omitempty"`
 	Desc      string                `form:"desc,omitempty" bson:"desc,omitempty"`
 	JobName   string                `form:"job_name,omitempty" bson:"job_name,omitempty"`
-	Skills    []Skill               `form:"skills,omitempty" bson:"skills,omitempty"`
+	Skills    []string              `form:"skills,omitempty" bson:"skills,omitempty"`
 	Roles     string                `form:"roles,omitempty" bson:"roles,omitempty"`
 	Username  string                `form:"username,omitempty" bson:"username,omitempty"`
 	Password  string                `form:"password,omitempty" bson:"password,omitempty"`
@@ -19,6 +19,7 @@ type User struct {
 	UpdatedAt time.Time             `json:"updated_at,omitempty" bson:"updated_at,omitempty"`
 }
 
-type Skill struct {
-	SkillName string `form:"skill_name,omitempty" bson:"skill_name,omitempty"`
+type LoginRequest struct {
+	Username string `form:"username" binding:"required"`
+	Password string `form:"password" binding:"required"`
 }
