@@ -4,9 +4,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"profile-api/middleware"
 	"profile-api/routes"
 
-	"github.com/gin-contrib/cors"
+	helmet "github.com/danielkov/gin-helmet"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,18 +16,9 @@ func main() {
 	// Create a new Gin router
 	router := gin.Default()
 
-	// Set up CORS middleware
-	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"*"}
-	config.AllowHeaders = []string{"Content-Type", "Origin", "Accept", "*"}
-	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE"}
-	config.AllowHeaders = []string{"Access-Control-Allow-Origin", "Origin", "*"}
-	config.AllowHeaders = []string{"Access-Control-Allow-Methods", "POST, GET, PUT, DELETE, OPTIONS, XMODIFY"}
-	config.AllowHeaders = []string{"Access-Control-Allow-Credentials", "true"}
-	config.AllowHeaders = []string{"Access-Control-Max-Age", "86400"}
-	config.AllowHeaders = []string{"Access-Control-Allow-Headers", "X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept"}
-	config.AllowCredentials = true
-	router.Use(cors.New(config))
+	router.Use(middleware.CORSMiddleware())
+	router.Use(helmet.Default())
+	router.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	// Set up Logger middleware
 	router.Use(gin.Logger())

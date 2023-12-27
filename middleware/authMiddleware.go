@@ -38,8 +38,11 @@ func EnsureUser() gin.HandlerFunc {
 			return
 		}
 
+		// fmt.Println(claims["id"], "CLAIMS")
 		// Set user information in the context
-		c.Set("userLogin", claims)
+		// c.Set("userLogin", claims)
+		c.Set("id", claims["id"])
+		c.Set("role_name", claims["roleType"])
 
 		// Optionally set additional flags based on the roleType
 		if roleType == "user" {

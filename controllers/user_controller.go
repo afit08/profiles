@@ -8,7 +8,6 @@ import (
 	"profile-api/configs"
 	"profile-api/helpers"
 	"profile-api/models"
-	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -91,21 +90,7 @@ func CreateUsers(c *gin.Context) {
 }
 
 func ShowUser(c *gin.Context) {
-	token := c.GetHeader("Authorization")
-
-	if token == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  http.StatusUnauthorized,
-			"message": "Unauthorized",
-		})
-		c.Abort()
-		return
-	}
-
-	token = strings.Split(token, " ")[1]
-	claims, _ := helpers.DecodeToken(token)
-	id := claims["id"].(string)
-	filter := bson.M{"_id": id}
+	filter := bson.M{"_id": c.Value("id")}
 
 	var users models.User
 	err := userCollection.FindOne(context.Background(), filter).Decode(&users)
@@ -188,9 +173,7 @@ func Login(c *gin.Context) {
 		c.Status(http.StatusUnauthorized)
 		return
 	}
-
-	c.SetCookie("jwt", token, 86400, "/", "localhost", false, true)
-
+	c.SetCookie("jwt", token, 10800, "/", "0.0.0.0", false, true)
 	result := gin.H{
 		"name":  user.Name,
 		"token": token,
@@ -199,6 +182,69 @@ func Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login Successfully!!!",
 		"status":  http.StatusOK,
+		"data":    result,
+	})
+}
+
+func Logout(c *gin.Context) {
+	_, err := c.Cookie("jwt")
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"message": "Cookie not found",
+		})
+		return
+	}
+	c.SetCookie("jwt", "", -1, "/", "0.0.0.0", true, false)
+	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
+}
+
+func UpdateUsers(c *gin.Context) {
+	var updateUser models.User
+	userID := c.Param("id")
+
+	uuid, err := uuid.Parse(userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+		return
+	}
+
+	if err := c.ShouldBind(&updateUser); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updateUser.ID = uuid.String()
+	filter := bson.M{"_id": updateUser.ID}
+	update := bson.M{"$set": updateUser}
+
+	if updateUser.Image != nil {
+		err := helpers.UploadImageToMinio(updateUser.Image, updateUser.Image.Filename)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error uploading image to MinIO"})
+			return
+		}
+	}
+
+	_, err = userCollection.UpdateOne(context.TODO(), filter, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error updating"})
+		return
+	}
+	fmt.Print(updateUser)
+	result := gin.H{
+		"id":         updateUser.ID,
+		"name":       updateUser.Name,
+		"image":      updateUser.Image.Filename,
+		"desc":       updateUser.Desc,
+		"job_name":   updateUser.JobName,
+		"skill_name": updateUser.Skills,
+		"role_name":  updateUser.Roles,
+		"username":   updateUser.Username,
+		"password":   updateUser.Password,
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Categori updated",
 		"data":    result,
 	})
 }
